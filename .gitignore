@@ -2,3 +2,8 @@ a.out
 *dSYM*
 *.o
 footpaths-processor
+*.osm
+*.txt
+*.csv
+*.xml
+*.pbf

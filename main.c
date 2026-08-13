@@ -10,9 +10,15 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/types.h>
+#include <libxml/parser.h>
+
+
 
 int MIN_ARGS = 2;
 int MAX_ARGS = 3;
+
+int OK = 0;
+int KO = -1;
 
 char HELP_FLAG[7] = "--help\0";
 
@@ -55,6 +61,10 @@ int args_parser(int ac, char **av, paths *p)
             return 1;
         } else if (index == 1 && i < MIN_ARGS) {
             printf("%s flag is missing. See --help for more info\n", FLAGS[i]);
+            return 1;
+        } else if (open(av[index], O_WRONLY | O_CREAT | O_TRUNC, 0644) < 0) {
+            printf("Path for %s flag {%s} cannot be opened nor created.\nRelated error:\n", av[index-1], av[index]);
+            perror(av[index]);
             return 1;
         } else if (index != 1) {
             p->paths[j] = malloc(sizeof(char) * strlen(av[index]) + 1);

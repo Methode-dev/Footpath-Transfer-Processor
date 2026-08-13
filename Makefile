@@ -9,7 +9,7 @@ OBJ	=	$(SRC:.c=.o)
 GCC	=	gcc
 
 CFLAGS	+=	-I./include \
-		-Wall -Werror -W
+		-Wall -Werror -W $(pkg-config --cflags --libs libxml-2.0)
 
 all:		$(NAME)
 
