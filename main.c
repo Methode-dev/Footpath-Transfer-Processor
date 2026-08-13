@@ -7,6 +7,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
 
 int MIN_ARGS = 2;
 int MAX_ARGS = 3;
@@ -17,10 +20,10 @@ char OSM_FLAG[6]  = "--osm\0";
 char GTFS_FLAG[7] = "--gtfs\0";
 char OUT_FLAG[10] = "--output\0";
 
+char *FLAGS[10] = {OSM_FLAG, GTFS_FLAG, OUT_FLAG, NULL}; // MANDATORY FLAGS MUST BE PLACED FIRST
+
 typedef struct {
-    char *output;
-    char *osm;
-    char *gtfs;
+    char **paths;
 } paths;
 
 int search_flag(int ac, char **av, char *flag)
@@ -29,31 +32,34 @@ int search_flag(int ac, char **av, char *flag)
         if (strcmp(flag, av[i]) == 0)
             return i + 1;
     }
-    return -1;
+    return 1;
 }
 
 int args_parser(int ac, char **av, paths *p)
 {
     int index;
-    int count = 0;
-    int flags_index[3] = {0, 0, 0}; // OSM, GTFS, OUTPUT
-    char *flags[10] = {OSM_FLAG, GTFS_FLAG, OUT_FLAG, NULL}; // MANDATORY FLAGS MUST BE PLACED FIRST
+    int flags_index[MAX_ARGS]; // OSM, GTFS, OUTPUT
 
+    for (int i = 0; i != MAX_ARGS; flags_index[i] = 0, i++);
     if (!(ac % 2) || ac < MIN_ARGS * 2 + 1 || ac > MAX_ARGS * 2 + 1) {
       printf("%s\n", "Wrong arguments. Please look at --help");
       return 1;
     }
-    for (int i = 0; flags[i] != NULL; i++) {
-        index = search_flag(ac, av, flags[i]);
-        count += 2;
+    p->paths = malloc(sizeof(char *) * MAX_ARGS + 1);
+
+    for (int i = 0, j = 0; FLAGS[i] != NULL; i++) {
+        index = search_flag(ac, av, FLAGS[i]);
         flags_index[i] = index - 1;
         if (i > 0 && flags_index[i] - 1 == flags_index[i - 1]) {
-            printf("Flag %s has no value. See --help for more info\n", flags[i - 1]);
-            return -1;
-        }
-        if (index == -1 && i < MIN_ARGS) {
-            printf("%s flag is missing. See --help for more info\n", flags[i]);
-            return -1;
+            printf("Flag %s has no value. See --help for more info\n", FLAGS[i - 1]);
+            return 1;
+        } else if (index == 1 && i < MIN_ARGS) {
+            printf("%s flag is missing. See --help for more info\n", FLAGS[i]);
+            return 1;
+        } else if (index != 1) {
+            p->paths[j] = malloc(sizeof(char) * strlen(av[index]) + 1);
+            strcpy(p->paths[j], av[index]);
+            j++;
         }
     }
     return 0;
@@ -76,5 +82,9 @@ int main(int ac, char **av)
         print_helper();
         return 0;
     }
-    return args_parser(ac, av, p);
+    if (args_parser(ac, av, p) == 1)
+        return 1;
+    else
+     printf("%s\n", p->paths[0]);
+    return 0;
 }
