@@ -7,3 +7,6 @@ footpaths-processor
 *.csv
 *.xml
 *.pbf
+.DS_Store
+parser
+osm_reader
