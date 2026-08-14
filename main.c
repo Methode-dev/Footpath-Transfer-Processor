@@ -24,13 +24,14 @@
 #define GTFS_FLAG "--gtfs\0"
 #define OUT_FLAG "--output\0"
 
-#define FLAGS = {OSM_FLAG, GTFS_FLAG, OUT_FLAG, NULL}; // MANDATORY FLAGS MUST BE PLACED FIRST
+const char* FLAGS[] = {OSM_FLAG, GTFS_FLAG, OUT_FLAG, NULL}; // MANDATORY FLAGS MUST BE PLACED FIRST
+
 
 typedef struct {
     char **paths;
 } paths;
 
-int search_flag(int ac, char **av, char *flag)
+static int search_flag(int ac, char **av, const char *flag)
 {
     for (int i = 1; i < ac; i += 1) {
         if (strcmp(flag, av[i]) == 0)
@@ -39,7 +40,7 @@ int search_flag(int ac, char **av, char *flag)
     return 1;
 }
 
-int args_parser(int ac, char **av, paths *p)
+static int args_parser(int ac, char **av, paths *p)
 {
     int index;
     int flags_index[MAX_ARGS]; // OSM, GTFS, OUTPUT
@@ -73,7 +74,7 @@ int args_parser(int ac, char **av, paths *p)
     return 0;
 }
 
-void print_helper(void)
+static void print_helper(void)
 {
     printf("USAGE: footpaths_processor [command] [arg]\n\n");
     printf("COMMANDS:\n");
