@@ -3,10 +3,11 @@
  * https://methode.dev
  */
 
-#include <libxml/xmlstring.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <math.h>
+#include <libxml/xmlstring.h>
 #include <libxml/xmlreader.h>
 
 typedef struct {
@@ -52,6 +53,13 @@ xmlTextReaderPtr get_reader(const char *file)
     return reader;
 }
 
+static void graph_free(Graph *graph)
+{
+    for (unsigned int i = 0; i < graph->node_count; i++)
+        free(graph->adj[i].edges);
+    free(graph->adj);
+}
+
 static unsigned int count_nodes(const char *file)
 {
     xmlTextReaderPtr reader = get_reader(file);
@@ -82,10 +90,35 @@ static size_t hash_id(long long id, size_t capacity) // +/- fmix64 mixing functi
     return (size_t)(x % capacity);
 }
 
+static double weight_distance_calculation(const Node *a, const Node *b)
+{
+    const double earth_radius = 6371000.0;
+    double lat1 = a->lat * M_PI / 180.0;
+    double lat2 = b->lat * M_PI / 180.0;
+    double dlat = (b->lat - a->lat) * M_PI / 180.0;
+    double dlon = (b->lon - a->lon) * M_PI / 180.0;
+    double h = sin(dlat / 2.0) * sin(dlat / 2.0) + cos(lat1) * cos(lat2) * sin(dlon / 2.0) * sin(dlon / 2.0);
+
+    return 2.0 * earth_radius * asin(sqrt(h));
+}
+
 static void node_map_init(NodeMap *map, size_t node_count)
 {
     map->capacity = (node_count >= 16) ? node_count * 2 : 16; // To avoid collisions as much as possible
     map->entries = calloc(map->capacity, sizeof(*map->entries));
+}
+
+static void graph_add_edge(Graph *graph, unsigned int from, unsigned int to, double weight)
+{
+    AdjList *list = &graph->adj[from];
+
+    if (list->count == list->capacity) {
+        list->capacity = ((list->capacity == 0) ? 4 : list->capacity * 2);
+        list->edges = realloc(list->edges, sizeof(*list->edges) * list->capacity);
+    }
+    list->edges[list->count].to = to;
+    list->edges[list->count].weight = weight;
+    list->count++;
 }
 
 static void node_map_insert(NodeMap *map, long long id, size_t index)
@@ -116,7 +149,7 @@ static Node *get_node(NodeMap *map, Node *nodes, long long id)
     return NULL;
 }
 
-static void parse_way(xmlTextReaderPtr reader, NodeMap *map, Node *nodes)
+static void parse_way(xmlTextReaderPtr reader, NodeMap *map, Node *nodes, Graph *graph)
 {
     const xmlChar *name;
     size_t ref_capacity = 16;
@@ -165,13 +198,14 @@ static void parse_way(xmlTextReaderPtr reader, NodeMap *map, Node *nodes)
         }
     }
     if (walkable) {
-        for (size_t i = 0; i < ref_count; i++) {
-            Node *node = get_node(map, nodes, refs[i]);
-            if (!node) {
+        for (size_t i = 0; i + 1 < ref_count; i++) {
+            Node *a = get_node(map, nodes, refs[i]);
+            Node *b = get_node(map, nodes, refs[i + 1]);
+            if (!a || !b)
                 continue;
-            } else {
-                printf("%lld: %.7f, %.7f\n", node->id, node->lat, node->lon);
-            }
+            double weight = weight_distance_calculation(a, b);
+            graph_add_edge(graph, a - nodes, b - nodes, weight);
+            graph_add_edge(graph, b - nodes, a - nodes, weight);
         }
     }
     free(refs);
@@ -205,7 +239,7 @@ static void process_nodes(xmlTextReaderPtr reader, Node *nodes, unsigned int *pa
     }
 }
 
-static void process_ways(xmlTextReaderPtr reader, Node *nodes, NodeMap *map)
+static void process_ways(xmlTextReaderPtr reader, Node *nodes, NodeMap *map, Graph *graph)
 {
     const xmlChar *name;
 
@@ -214,7 +248,7 @@ static void process_ways(xmlTextReaderPtr reader, Node *nodes, NodeMap *map)
             continue;
         name = xmlTextReaderConstName(reader);
         if (xmlStrEqual(name, BAD_CAST "way"))
-            parse_way(reader, map, nodes);
+            parse_way(reader, map, nodes, graph);
     }
 }
 
@@ -233,6 +267,7 @@ int main(int argc, char **av)
     xmlTextReaderPtr reader = get_reader(av[1]);
     Node *nodes = malloc(sizeof(Node) * (node_count + 1));
     NodeMap map;
+    Graph graph;
     unsigned int parsed_nodes = 0;
 
     process_nodes(reader, nodes, &parsed_nodes);
@@ -240,12 +275,11 @@ int main(int argc, char **av)
     for (unsigned int i = 0; i < parsed_nodes; i++) {
         node_map_insert(&map, nodes[i].id, i);
     }
-    Graph graph;
-
     graph_init(&graph, parsed_nodes);
     reader = get_reader(av[1]);
-    process_ways(reader, nodes, &map);
+    process_ways(reader, nodes, &map, &graph);
     xmlFreeTextReader(reader);
+    graph_free(&graph);
     free(map.entries);
     free(nodes);
     return 0;
