@@ -1,7 +1,6 @@
 /*
- * '--osm' -> '{path}'
- * '--gtfs' -> '{path}'
- * ['--output'] -> '{path}'
+ * MÉTHODE SAS
+ * https://methode.dev
  */
 
 #include <stdio.h>
@@ -13,20 +12,19 @@
 #include <libxml/parser.h>
 
 
+#define MIN_ARGS 2
+#define MAX_ARGS 3
 
-int MIN_ARGS = 2;
-int MAX_ARGS = 3;
+#define OK 0
+#define KO 1
 
-int OK = 0;
-int KO = -1;
+#define HELP_FLAG "--help\0"
 
-char HELP_FLAG[7] = "--help\0";
+#define OSM_FLAG "--osm\0"
+#define GTFS_FLAG "--gtfs\0"
+#define OUT_FLAG "--output\0"
 
-char OSM_FLAG[6]  = "--osm\0";
-char GTFS_FLAG[7] = "--gtfs\0";
-char OUT_FLAG[10] = "--output\0";
-
-char *FLAGS[10] = {OSM_FLAG, GTFS_FLAG, OUT_FLAG, NULL}; // MANDATORY FLAGS MUST BE PLACED FIRST
+#define FLAGS = {OSM_FLAG, GTFS_FLAG, OUT_FLAG, NULL}; // MANDATORY FLAGS MUST BE PLACED FIRST
 
 typedef struct {
     char **paths;
