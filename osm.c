@@ -3,6 +3,7 @@
  * https://methode.dev
  */
 
+#include <libxml/xmlstring.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -24,6 +25,22 @@ typedef struct {
     NodeIndex *entries;
     size_t capacity;
 } NodeMap;
+
+typedef struct {
+    unsigned int to;
+    double weight;
+} Edge;
+
+typedef struct {
+    Edge *edges;
+    unsigned int count;
+    unsigned int capacity;
+} AdjList;
+
+typedef struct {
+    AdjList *adj;
+    unsigned int node_count;
+} Graph;
 
 xmlTextReaderPtr get_reader(const char *file)
 {
@@ -99,14 +116,73 @@ static Node *get_node(NodeMap *map, Node *nodes, long long id)
     return NULL;
 }
 
+static void parse_way(xmlTextReaderPtr reader, NodeMap *map, Node *nodes)
+{
+    const xmlChar *name;
+    size_t ref_capacity = 16;
+    long long *refs = malloc(sizeof(long long *) * ref_capacity);
+    size_t ref_count = 0;
+    int walkable = 0;
+
+    while (xmlTextReaderRead(reader) == 1) {
+        if (xmlTextReaderNodeType(reader) == XML_READER_TYPE_END_ELEMENT) {
+            if (xmlStrEqual(xmlTextReaderConstName(reader), BAD_CAST "way"))
+                break;
+            continue;
+        } else if (xmlTextReaderNodeType(reader) != XML_READER_TYPE_ELEMENT) {
+            continue;
+        }
+        name = xmlTextReaderConstName(reader);
+        if (xmlStrEqual(name, BAD_CAST "nd")) {
+            xmlChar *ref = xmlTextReaderGetAttribute(reader, BAD_CAST "ref");
+            if (ref_count == ref_capacity) {
+                ref_capacity *= 2;
+                long long *tmp = realloc(refs, sizeof(*refs) * ref_capacity);
+                refs = tmp;
+
+            }
+            refs[ref_count++] = strtoll((char *)ref, NULL, 10);
+            xmlFree(ref);
+        } else if (xmlStrEqual(name, BAD_CAST "tag")) {
+            xmlChar *key = xmlTextReaderGetAttribute(reader, BAD_CAST "k");
+            xmlChar *value = xmlTextReaderGetAttribute(reader, BAD_CAST "v");
+            if (key && value && xmlStrEqual(key, BAD_CAST "highway")) {
+                if (
+                    xmlStrEqual(value, BAD_CAST "footway") ||
+                    xmlStrEqual(value, BAD_CAST "pedestrian") ||
+                    xmlStrEqual(value, BAD_CAST "path") ||
+                    xmlStrEqual(value, BAD_CAST "steps") ||
+                    xmlStrEqual(value, BAD_CAST "living_street") ||
+                    xmlStrEqual(value, BAD_CAST "residential") ||
+                    xmlStrEqual(value, BAD_CAST "service") ||
+                    xmlStrEqual(value, BAD_CAST "track") ||
+                    xmlStrEqual(value, BAD_CAST "unclassified")
+                )
+                    walkable = 1;
+            }
+            xmlFree(key);
+            xmlFree(value);
+        }
+    }
+    if (walkable) {
+        for (size_t i = 0; i < ref_count; i++) {
+            Node *node = get_node(map, nodes, refs[i]);
+            if (!node) {
+                continue;
+            } else {
+                printf("%lld: %.7f, %.7f\n", node->id, node->lat, node->lon);
+            }
+        }
+    }
+    free(refs);
+}
+
 static void parse_node(xmlTextReaderPtr reader, Node *nodes, unsigned int *count)
 {
     xmlChar *id = xmlTextReaderGetAttribute(reader, BAD_CAST "id");
     xmlChar *lat = xmlTextReaderGetAttribute(reader, BAD_CAST "lat");
     xmlChar *lon = xmlTextReaderGetAttribute(reader, BAD_CAST "lon");
 
-    // if (id && lat && lon)
-    //     printf("id: %s\nlat: %s | lon: %s\n\n\n", id, lat, lon);
     nodes[*count].id = strtoll((char *)id, NULL, 10);
     nodes[*count].lat = strtod((char *)lat, NULL);
     nodes[*count].lon = strtod((char *)lon, NULL);
@@ -116,22 +192,61 @@ static void parse_node(xmlTextReaderPtr reader, Node *nodes, unsigned int *count
     xmlFree(lon);
 }
 
+static void process_nodes(xmlTextReaderPtr reader, Node *nodes, unsigned int *parsed_nodes)
+{
+    const xmlChar *name;
+
+    while (xmlTextReaderRead(reader) == 1) {
+        if (xmlTextReaderNodeType(reader) != XML_READER_TYPE_ELEMENT)
+            continue;
+        name = xmlTextReaderConstName(reader);
+        if (xmlStrEqual(name, BAD_CAST "node"))
+            parse_node(reader, nodes, parsed_nodes);
+    }
+}
+
+static void process_ways(xmlTextReaderPtr reader, Node *nodes, NodeMap *map)
+{
+    const xmlChar *name;
+
+    while (xmlTextReaderRead(reader) == 1) {
+        if (xmlTextReaderNodeType(reader) != XML_READER_TYPE_ELEMENT)
+            continue;
+        name = xmlTextReaderConstName(reader);
+        if (xmlStrEqual(name, BAD_CAST "way"))
+            parse_way(reader, map, nodes);
+    }
+}
+
+static void graph_init(Graph *graph, unsigned int node_count)
+{
+    graph->node_count = node_count;
+    graph->adj = calloc(
+        node_count,
+        sizeof *graph->adj
+    );
+}
+
 int main(int argc, char **av)
 {
     const unsigned int node_count = count_nodes(av[1]);
     xmlTextReaderPtr reader = get_reader(av[1]);
     Node *nodes = malloc(sizeof(Node) * (node_count + 1));
+    NodeMap map;
     unsigned int parsed_nodes = 0;
 
-    while (xmlTextReaderRead(reader) == 1) {
-        if (xmlTextReaderNodeType(reader) != XML_READER_TYPE_ELEMENT)
-            continue;
-        const xmlChar *name = xmlTextReaderConstName(reader);
-
-        if (xmlStrEqual(name, BAD_CAST "node"))
-            parse_node(reader, nodes, &parsed_nodes);
+    process_nodes(reader, nodes, &parsed_nodes);
+    node_map_init(&map, parsed_nodes);
+    for (unsigned int i = 0; i < parsed_nodes; i++) {
+        node_map_insert(&map, nodes[i].id, i);
     }
+    Graph graph;
+
+    graph_init(&graph, parsed_nodes);
+    reader = get_reader(av[1]);
+    process_ways(reader, nodes, &map);
     xmlFreeTextReader(reader);
+    free(map.entries);
     free(nodes);
     return 0;
 }
