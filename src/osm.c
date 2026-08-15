@@ -3,45 +3,20 @@
  * https://methode.dev
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <math.h>
-#include <libxml/xmlstring.h>
-#include <libxml/xmlreader.h>
+#include "osm.h"
 
-typedef struct {
-    long long id;
-    double lat;
-    double lon;
-} Node;
-
-typedef struct {
-    long long id;
-    size_t index;
-    bool used;
-} NodeIndex;
-
-typedef struct {
-    NodeIndex *entries;
-    size_t capacity;
-} NodeMap;
-
-typedef struct {
-    unsigned int to;
-    double weight;
-} Edge;
-
-typedef struct {
-    Edge *edges;
-    unsigned int count;
-    unsigned int capacity;
-} AdjList;
-
-typedef struct {
-    AdjList *adj;
-    unsigned int node_count;
-} Graph;
+static unsigned int count_nodes(const char *file);
+static size_t hash_id(long long id, size_t capacity);
+static double weight_distance_calculation(const Node *a, const Node *b);
+static void node_map_init(NodeMap *map, size_t node_count);
+static void node_map_insert(NodeMap *map, long long id, size_t index);
+static Node *get_node(NodeMap *map, Node *nodes, long long id);
+static void graph_init(Graph *graph, unsigned int node_count, Node *nodes);
+static void graph_add_edge(Graph *graph, unsigned int from, unsigned int to, double weight);
+static void parse_node(xmlTextReaderPtr reader, Node *nodes, unsigned int *count);
+static void parse_way(xmlTextReaderPtr reader, NodeMap *map, Node *nodes, Graph *graph);
+static void process_nodes(xmlTextReaderPtr reader, Node *nodes, unsigned int *parsed_nodes);
+static void process_ways(xmlTextReaderPtr reader, Node *nodes, NodeMap *map, Graph *graph);
 
 xmlTextReaderPtr get_reader(const char *file)
 {
@@ -53,11 +28,13 @@ xmlTextReaderPtr get_reader(const char *file)
     return reader;
 }
 
-static void graph_free(Graph *graph)
+void graph_free(Graph *graph)
 {
     for (unsigned int i = 0; i < graph->node_count; i++)
         free(graph->adj[i].edges);
     free(graph->adj);
+    free(graph->nodes);
+    free(graph);
 }
 
 static unsigned int count_nodes(const char *file)
@@ -252,22 +229,24 @@ static void process_ways(xmlTextReaderPtr reader, Node *nodes, NodeMap *map, Gra
     }
 }
 
-static void graph_init(Graph *graph, unsigned int node_count)
+static void graph_init(Graph *graph, unsigned int node_count, Node *nodes)
 {
     graph->node_count = node_count;
+    graph->nodes = nodes;
     graph->adj = calloc(
         node_count,
         sizeof *graph->adj
     );
 }
 
-int main(int argc, char **av)
+
+Graph *parse_osm(const char *filename)
 {
-    const unsigned int node_count = count_nodes(av[1]);
-    xmlTextReaderPtr reader = get_reader(av[1]);
+    const unsigned int node_count = count_nodes(filename);
+    xmlTextReaderPtr reader = get_reader(filename);
     Node *nodes = malloc(sizeof(Node) * (node_count + 1));
     NodeMap map;
-    Graph graph;
+    Graph *graph = malloc(sizeof(Graph *));
     unsigned int parsed_nodes = 0;
 
     process_nodes(reader, nodes, &parsed_nodes);
@@ -275,12 +254,10 @@ int main(int argc, char **av)
     for (unsigned int i = 0; i < parsed_nodes; i++) {
         node_map_insert(&map, nodes[i].id, i);
     }
-    graph_init(&graph, parsed_nodes);
-    reader = get_reader(av[1]);
-    process_ways(reader, nodes, &map, &graph);
+    graph_init(graph, parsed_nodes, nodes);
+    reader = get_reader(filename);
+    process_ways(reader, nodes, &map, graph);
     xmlFreeTextReader(reader);
-    graph_free(&graph);
     free(map.entries);
-    free(nodes);
-    return 0;
+    return graph;
 }

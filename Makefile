@@ -2,19 +2,26 @@ NAME	=	footpaths-processor
 
 RM	=	rm -f
 
-SRC	=	main.c
+SRCDIR	=	src
+INCDIR	=	include
+
+SRC	=	$(wildcard $(SRCDIR)/*.c)
 
 OBJ	=	$(SRC:.c=.o)
 
-GCC	=	gcc
+INC	=	$(wildcard $(INCDIR)/*.h)
 
-CFLAGS	+=	-I./include \
-		-Wall -Werror -W $(pkg-config --cflags --libs libxml-2.0)
+CC	=	gcc
+
+CFLAGS	+=	-I$(INCDIR) \
+		-Wall -Werror -W $(shell pkg-config --cflags libxml-2.0)
+
+LDFLAGS	+=	$(shell pkg-config --libs libxml-2.0) -lm
 
 all:		$(NAME)
 
 $(NAME):	$(OBJ)
-		$(GCC) $(CFLAGS) $? $(LDFLAGS) -o $@
+		$(CC) $(CFLAGS) $(OBJ) $(LDFLAGS) -o $@
 
 clean:
 	$(RM) $(OBJ)
@@ -24,7 +31,24 @@ fclean: clean
 
 re:	fclean all
 
-.PHONY:	all clean fclean re
+# Compilation database for clangd (Zed, VS Code, vim/nvim, emacs...).
+# Regenerate after adding files: `make cdb`
+CDB	=	compile_commands.json
 
-%.o: %.c ./include/my.h
+cdb:	$(CDB)
+
+$(CDB):	Makefile
+	@printf '[\n' > $@
+	@first=1; for src in $(SRC); do \
+		[ $$first -eq 1 ] || printf ',\n' >> $@; \
+		first=0; \
+		printf '  {"directory": "%s", "file": "%s", "command": "%s %s -c %s -o %s"}' \
+			"$(CURDIR)" "$$src" "$(CC)" "$(CFLAGS)" "$$src" "$${src%.c}.o" >> $@; \
+	done
+	@printf '\n]\n' >> $@
+	@echo "Wrote $@"
+
+.PHONY:	all clean fclean re cdb
+
+%.o: %.c $(INC)
 	$(CC) $(CFLAGS) -c -o $@ $<

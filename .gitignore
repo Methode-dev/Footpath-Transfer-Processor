@@ -10,3 +10,5 @@ footpaths-processor
 .DS_Store
 parser
 osm_reader
+compile_commands.json
+.cache/

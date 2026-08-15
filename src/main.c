@@ -10,7 +10,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <libxml/parser.h>
-
+#include "osm.h"
 
 #define MIN_ARGS 2
 #define MAX_ARGS 3
@@ -95,5 +95,7 @@ int main(int ac, char **av)
         return 1;
     else
      printf("%s\n", p->paths[0]);
+    Graph *graph = parse_osm(av[1]);
+    graph_free(graph);
     return 0;
 }
