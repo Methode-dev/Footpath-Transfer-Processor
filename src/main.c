@@ -3,33 +3,7 @@
  * https://methode.dev
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <libxml/parser.h>
-#include "osm.h"
-
-#define MIN_ARGS 2
-#define MAX_ARGS 3
-
-#define OK 0
-#define KO 1
-
-#define HELP_FLAG "--help\0"
-
-#define OSM_FLAG "--osm\0"
-#define GTFS_FLAG "--gtfs\0"
-#define OUT_FLAG "--output\0"
-
-const char* FLAGS[] = {OSM_FLAG, GTFS_FLAG, OUT_FLAG, NULL}; // MANDATORY FLAGS MUST BE PLACED FIRST
-
-
-typedef struct {
-    char **paths;
-} paths;
+#include "main.h"
 
 static int search_flag(int ac, char **av, const char *flag)
 {
@@ -61,7 +35,9 @@ static int args_parser(int ac, char **av, paths *p)
         } else if (index == 1 && i < MIN_ARGS) {
             printf("%s flag is missing. See --help for more info\n", FLAGS[i]);
             return 1;
-        } else if (open(av[index], O_WRONLY | O_CREAT | O_TRUNC, 0644) < 0) {
+        } else if (index == 1) {
+            continue;
+        } else if (open(av[index], O_WRONLY | O_CREAT, 0644) < 0) {
             printf("Path for %s flag {%s} cannot be opened nor created.\nRelated error:\n", av[index-1], av[index]);
             perror(av[index]);
             return 1;
@@ -93,9 +69,7 @@ int main(int ac, char **av)
     }
     if (args_parser(ac, av, p) == 1)
         return 1;
-    else
-     printf("%s\n", p->paths[0]);
-    Graph *graph = parse_osm(av[1]);
+    Graph *graph = parse_osm(p->paths[0]);
     graph_free(graph);
     return 0;
 }
