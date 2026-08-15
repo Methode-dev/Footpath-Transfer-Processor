@@ -5,27 +5,49 @@
 
 #include "osm.h"
 
+/* Graph */
+static void graph_init(Graph *graph, unsigned int node_count, Node *nodes);
+static void graph_add_edge(Graph *graph, unsigned int from, unsigned int to, double weight);
+
+/* Misc */
 static unsigned int count_nodes(const char *file);
 static size_t hash_id(long long id, size_t capacity);
 static double weight_distance_calculation(const Node *a, const Node *b);
 static void node_map_init(NodeMap *map, size_t node_count);
 static void node_map_insert(NodeMap *map, long long id, size_t index);
 static Node *get_node(NodeMap *map, Node *nodes, long long id);
-static void graph_init(Graph *graph, unsigned int node_count, Node *nodes);
-static void graph_add_edge(Graph *graph, unsigned int from, unsigned int to, double weight);
+
+/* Parse & process */
 static void parse_node(xmlTextReaderPtr reader, Node *nodes, unsigned int *count);
 static void parse_way(xmlTextReaderPtr reader, NodeMap *map, Node *nodes, Graph *graph);
 static void process_nodes(xmlTextReaderPtr reader, Node *nodes, unsigned int *parsed_nodes);
 static void process_ways(xmlTextReaderPtr reader, Node *nodes, NodeMap *map, Graph *graph);
 
-xmlTextReaderPtr get_reader(const char *file)
+/*
+ * Graph
+ */
+
+static void graph_init(Graph *graph, unsigned int node_count, Node *nodes)
 {
-    xmlTextReaderPtr reader = xmlReaderForFile(file, NULL, XML_PARSE_HUGE);
-    if (!reader) {
-        printf("Failed to open %s\n", file);
-        exit(1);
+    graph->node_count = node_count;
+    graph->nodes = nodes;
+    graph->adj = calloc(
+        node_count,
+        sizeof *graph->adj
+    );
+}
+
+static void graph_add_edge(Graph *graph, unsigned int from, unsigned int to, double weight)
+{
+    AdjList *list = &graph->adj[from];
+
+    if (list->count == list->capacity) {
+        list->capacity = ((list->capacity == 0) ? 4 : list->capacity * 2);
+        list->edges = realloc(list->edges, sizeof(*list->edges) * list->capacity);
     }
-    return reader;
+    list->edges[list->count].to = to;
+    list->edges[list->count].weight = weight;
+    list->count++;
 }
 
 void graph_free(Graph *graph)
@@ -35,6 +57,20 @@ void graph_free(Graph *graph)
     free(graph->adj);
     free(graph->nodes);
     free(graph);
+}
+
+/*
+ * Misc & Nodes
+ */
+
+xmlTextReaderPtr get_reader(const char *file)
+{
+    xmlTextReaderPtr reader = xmlReaderForFile(file, NULL, XML_PARSE_HUGE);
+    if (!reader) {
+        printf("Failed to open %s\n", file);
+        exit(1);
+    }
+    return reader;
 }
 
 static unsigned int count_nodes(const char *file)
@@ -85,19 +121,6 @@ static void node_map_init(NodeMap *map, size_t node_count)
     map->entries = calloc(map->capacity, sizeof(*map->entries));
 }
 
-static void graph_add_edge(Graph *graph, unsigned int from, unsigned int to, double weight)
-{
-    AdjList *list = &graph->adj[from];
-
-    if (list->count == list->capacity) {
-        list->capacity = ((list->capacity == 0) ? 4 : list->capacity * 2);
-        list->edges = realloc(list->edges, sizeof(*list->edges) * list->capacity);
-    }
-    list->edges[list->count].to = to;
-    list->edges[list->count].weight = weight;
-    list->count++;
-}
-
 static void node_map_insert(NodeMap *map, long long id, size_t index)
 {
     size_t position = hash_id(id, map->capacity);
@@ -124,6 +147,25 @@ static Node *get_node(NodeMap *map, Node *nodes, long long id)
         position = (position + 1) % map->capacity;
     }
     return NULL;
+}
+
+/*
+ * Parse & process
+ */
+
+static void parse_node(xmlTextReaderPtr reader, Node *nodes, unsigned int *count)
+{
+    xmlChar *id = xmlTextReaderGetAttribute(reader, BAD_CAST "id");
+    xmlChar *lat = xmlTextReaderGetAttribute(reader, BAD_CAST "lat");
+    xmlChar *lon = xmlTextReaderGetAttribute(reader, BAD_CAST "lon");
+
+    nodes[*count].id = strtoll((char *)id, NULL, 10);
+    nodes[*count].lat = strtod((char *)lat, NULL);
+    nodes[*count].lon = strtod((char *)lon, NULL);
+    (*count)++;
+    xmlFree(id);
+    xmlFree(lat);
+    xmlFree(lon);
 }
 
 static void parse_way(xmlTextReaderPtr reader, NodeMap *map, Node *nodes, Graph *graph)
@@ -188,21 +230,6 @@ static void parse_way(xmlTextReaderPtr reader, NodeMap *map, Node *nodes, Graph 
     free(refs);
 }
 
-static void parse_node(xmlTextReaderPtr reader, Node *nodes, unsigned int *count)
-{
-    xmlChar *id = xmlTextReaderGetAttribute(reader, BAD_CAST "id");
-    xmlChar *lat = xmlTextReaderGetAttribute(reader, BAD_CAST "lat");
-    xmlChar *lon = xmlTextReaderGetAttribute(reader, BAD_CAST "lon");
-
-    nodes[*count].id = strtoll((char *)id, NULL, 10);
-    nodes[*count].lat = strtod((char *)lat, NULL);
-    nodes[*count].lon = strtod((char *)lon, NULL);
-    (*count)++;
-    xmlFree(id);
-    xmlFree(lat);
-    xmlFree(lon);
-}
-
 static void process_nodes(xmlTextReaderPtr reader, Node *nodes, unsigned int *parsed_nodes)
 {
     const xmlChar *name;
@@ -228,17 +255,6 @@ static void process_ways(xmlTextReaderPtr reader, Node *nodes, NodeMap *map, Gra
             parse_way(reader, map, nodes, graph);
     }
 }
-
-static void graph_init(Graph *graph, unsigned int node_count, Node *nodes)
-{
-    graph->node_count = node_count;
-    graph->nodes = nodes;
-    graph->adj = calloc(
-        node_count,
-        sizeof *graph->adj
-    );
-}
-
 
 Graph *parse_osm(const char *filename)
 {

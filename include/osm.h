@@ -1,3 +1,8 @@
+/*
+ * MÉTHODE SAS
+ * https://methode.dev
+ */
+
 #ifndef OSM_H
 #define OSM_H
 
