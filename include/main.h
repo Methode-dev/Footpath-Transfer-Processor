@@ -13,7 +13,6 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <libxml/parser.h>
-#include "osm.h"
 
 #define MIN_ARGS 2
 #define MAX_ARGS 3

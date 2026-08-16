@@ -4,6 +4,8 @@
  */
 
 #include "main.h"
+#include "osm.h"
+#include "gtfs.h"
 
 static int search_flag(int ac, char **av, const char *flag)
 {
@@ -69,6 +71,9 @@ int main(int ac, char **av)
     }
     if (args_parser(ac, av, p) == 1)
         return 1;
+    StopsHeader *tmp = parse_stops(p->paths[1]);
+    printf("%d %d %d\n", tmp->stop_id, tmp->stop_lat, tmp->stop_lon);
+    exit(0);
     Graph *graph = parse_osm(p->paths[0]);
     graph_free(graph);
     return 0;
