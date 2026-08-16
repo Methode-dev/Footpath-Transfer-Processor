@@ -64,6 +64,7 @@ static void print_helper(void)
 int main(int ac, char **av)
 {
     paths *p = malloc(sizeof(paths));
+    unsigned int stop_count;
 
     if (ac == 2 && strcmp(av[1], HELP_FLAG) == 0) {
         print_helper();
@@ -71,10 +72,9 @@ int main(int ac, char **av)
     }
     if (args_parser(ac, av, p) == 1)
         return 1;
-    StopsHeader *tmp = parse_stops(p->paths[1]);
-    printf("%d %d %d\n", tmp->stop_id, tmp->stop_lat, tmp->stop_lon);
-    exit(0);
+    BusStop *stops = parse_stops(p->paths[1], &stop_count);
     Graph *graph = parse_osm(p->paths[0]);
+    stops_free(stops, stop_count);
     graph_free(graph);
     return 0;
 }

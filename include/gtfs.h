@@ -24,6 +24,7 @@ typedef struct {
     unsigned int graph_node;
 } BusStop;
 
-StopsHeader *parse_stops(const char *);
+BusStop *parse_stops(const char *, unsigned int *);
+void stops_free(BusStop *, unsigned int);
 
 #endif
