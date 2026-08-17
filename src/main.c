@@ -6,6 +6,8 @@
 #include "main.h"
 #include "osm.h"
 #include "gtfs.h"
+#include "kdtree.h"
+#include "merge.h"
 
 static int search_flag(int ac, char **av, const char *flag)
 {
@@ -74,7 +76,11 @@ int main(int ac, char **av)
         return 1;
     BusStop *stops = parse_stops(p->paths[1], &stop_count);
     Graph *graph = parse_osm(p->paths[0]);
+    KDTree *tree = kdtree_build(graph);
+    unsigned int node = kdtree_nearest(tree, graph, 48.8566, 2.3522);
+    merge_stops(graph, stops, stop_count);
     stops_free(stops, stop_count);
     graph_free(graph);
+    kdtree_free(tree);
     return 0;
 }
