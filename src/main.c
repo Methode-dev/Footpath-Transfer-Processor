@@ -77,8 +77,9 @@ int main(int ac, char **av)
     BusStop *stops = parse_stops(p->paths[1], &stop_count);
     Graph *graph = parse_osm(p->paths[0]);
     KDTree *tree = kdtree_build(graph);
-    unsigned int node = kdtree_nearest(tree, graph, 48.8566, 2.3522);
-    merge_stops(graph, stops, stop_count);
+    if (tree == NULL || graph == NULL || stops == NULL)
+        return 1;
+    merge_stops(graph, stops, stop_count, tree);
     stops_free(stops, stop_count);
     graph_free(graph);
     kdtree_free(tree);

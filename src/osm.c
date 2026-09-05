@@ -262,9 +262,11 @@ Graph *parse_osm(const char *filename)
     xmlTextReaderPtr reader = get_reader(filename);
     Node *nodes = malloc(sizeof(Node) * (node_count + 1));
     NodeMap map;
-    Graph *graph = malloc(sizeof(Graph *));
+    Graph *graph = malloc(sizeof(*graph));
     unsigned int parsed_nodes = 0;
 
+    if (nodes == NULL || graph == NULL)
+        return NULL;
     process_nodes(reader, nodes, &parsed_nodes);
     node_map_init(&map, parsed_nodes);
     for (unsigned int i = 0; i < parsed_nodes; i++) {

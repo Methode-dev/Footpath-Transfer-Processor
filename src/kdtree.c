@@ -83,12 +83,13 @@ static void nearest(const KDNode *node, const Graph *graph, double lat, double l
     }
 }
 
-int kdtree_nearest(const KDTree *tree, const Graph *graph, double lat, double lon)
+unsigned int kdtree_nearest(const KDTree *tree, const Graph *graph, double lat, double lon, double *distance)
 {
     unsigned int best_node = 0;
     double best_distance = DBL_MAX;
 
     nearest(tree->root, graph, lat, lon, 0, &best_node, &best_distance);
+    *distance = best_distance;
     return best_node;
 }
 
@@ -98,7 +99,8 @@ static KDNode *build_tree(const Graph *graph, unsigned int *indices, unsigned in
     unsigned int middle = count / 2;
     KDNode *node = malloc(sizeof(KDNode));
 
-    if (count == 0)
+
+    if (node == NULL || count == 0)
         return NULL;
     sort_graph = graph;
     sort_lon = split_lon;
@@ -114,6 +116,8 @@ KDTree *kdtree_build(const Graph *graph)
     KDTree *tree = malloc(sizeof(KDTree));
     unsigned int *indices = malloc(sizeof(unsigned int) * graph->node_count);
 
+    if (tree == NULL || indices == NULL)
+        return NULL;
     for (unsigned int i = 0; i < graph->node_count; i++)
         indices[i] = i;
     tree->root = build_tree(graph, indices, graph->node_count, 0);

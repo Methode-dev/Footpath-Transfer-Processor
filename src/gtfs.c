@@ -138,6 +138,8 @@ BusStop *parse_stops(const char *filename, unsigned int *stop_count)
     char **fields;
 
     free(line);
+    if (stops == NULL)
+        return NULL;
     for (*stop_count = 0; (line = get_line(file)) != NULL; (*stop_count)++) {
         fields = str_to_tab(line, ',');
         if (*stop_count == estimate) {

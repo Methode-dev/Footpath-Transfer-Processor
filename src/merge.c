@@ -5,19 +5,18 @@
 
 #include "merge.h"
 #include "gtfs.h"
+#include "kdtree.h"
 
-static unsigned int find_closest_node(Graph *graph, BusStop *stop)
-{
-    if (graph && stop) {
-        return 1;
-    }
-    return 0;
-}
 
-void merge_stops(Graph *graph, BusStop *stops, unsigned int stop_count)
+void merge_stops(Graph *graph, BusStop *stops, unsigned int stop_count, const KDTree *tree)
 {
+    double distance;
+
     for (unsigned int i = 0; i < stop_count; i++) {
-        printf("%s: %f, %f -- %d\n", stops[i].id, stops[i].lat, stops[i].lon, graph->node_count);
+        stops[i].graph_node = kdtree_nearest(tree, graph, stops[i].lat, stops[i].lon, &distance);
+        if (distance > MAX_STOP_DISTANCE)
+            stops[i].graph_node = UINT_MAX;
+        if (stops[i].graph_node == UINT_MAX)
+            printf("%s -> outside OSM\n", stops[i].id);
     }
-    find_closest_node(graph, &stops[0]);
 }

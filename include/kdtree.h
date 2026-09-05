@@ -25,6 +25,6 @@ typedef struct {
 
 KDTree *kdtree_build(const Graph *);
 void kdtree_free(KDTree *);
-int kdtree_nearest(const KDTree *, const Graph *, double, double);
+unsigned int kdtree_nearest(const KDTree *, const Graph *, double, double, double *);
 
 #endif
